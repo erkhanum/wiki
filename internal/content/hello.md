@@ -1,5 +1,9 @@
-# Hello 
+---
+title: "Hello World"
+author: "Erhan"
+date: "2026-08-29"
+---
 
-This is my first page
-addadwkjhfsdf
-adwawdwadwad
+# Hello World
+
+This is my first page.
