@@ -7,44 +7,56 @@ import (
 	"github.com/yuin/goldmark"
 	"path/filepath"
 	"strings"
+	"io/fs"
 )
 
 func main() {
 
 	dirPath := "internal/content"
-	files, err := os.ReadDir(dirPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	for _, entry := range files {
-		if entry.IsDir() {
-			continue
-		}
-		if filepath.Ext(entry.Name()) != ".md" {
-				continue
-		}
-		fullPath := filepath.Join(dirPath, entry.Name())
-		content, err := os.ReadFile(fullPath)
+
+	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			fmt.Printf("Error reading file %s: %v\n", entry.Name(), err)
-			continue
+			return err
 		}
-		name := strings.TrimSuffix(entry.Name(), ".md")
-		outputPath := filepath.Join("public", name+".html")
+		if d.IsDir() {
+				return nil
+		} 
+		if filepath.Ext(d.Name()) != ".md" {
+			return nil
+		}
+		
+		content, err := os.ReadFile(path)
+		if err != nil {
+			fmt.Printf("Error reading file %s: %v\n", d.Name(), err)
+			return nil
+		}
+		relativePath, err := filepath.Rel(dirPath, path)
+		if err != nil {
+			return err
+		}
+
+		relativePath = strings.TrimSuffix(relativePath, ".md") + ".html"
+
+		outputPath := filepath.Join("public", relativePath)
 
 		file, err := os.Create(outputPath)
 		if err != nil {
-			log.Printf("Error creating %s: %v\n", outputPath, err)
-			continue
+			fmt.Printf("Error creating file %s: %v\n", outputPath, err)
+			return nil
 		}
+
 		err = goldmark.Convert(content, file)
 		if err != nil {
-			log.Printf("Error converting %s: %v\n", entry.Name(), err)
+			fmt.Printf("Error converting %s: %v\n", path, err)
 		}
 
 		file.Close()
-	}	
+
+		fmt.Printf("Generated: %s\n", outputPath)
+
+		return nil
+	})
+	if err != nil {
+			log.Fatal(err)
+		}
 }
-
-
-
