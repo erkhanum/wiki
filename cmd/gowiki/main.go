@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"gopkg.in/yaml.v3"
 	"html/template"
+	"bytes"
 )
 
 type FrontMatter struct {
@@ -63,7 +64,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -74,21 +75,32 @@ func main() {
 			return nil
 		}
 		
-		content, err := os.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
-			fmt.Printf("Error reading file %s: %v\n", d.Name(), err)
+			fmt.Printf("Error reading %s: %v\n", path, err)
 			return nil
 		}
 
-		frontMatter, markdown, err := parseFrontMatter(content)
+		frontMatter, markdown, err := parseFrontMatter(data)
 		if err != nil {
 			fmt.Printf("Error parsing %s: %v\n", path, err)
 			return nil
 		}
+		var buffer bytes.Buffer
 
-		fmt.Println("Title:", frontMatter.Title)
-		fmt.Println("Author:", frontMatter.Author)
-		fmt.Println("Date:", frontMatter.Date)
+		err = goldmark.Convert(markdown, &buffer)
+		if err != nil {
+			fmt.Printf("Error converting %s: %v\n", path, err)
+			return nil
+		}
+
+		// Create Page data
+		page := Page{
+			Title:   frontMatter.Title,
+			Author:  frontMatter.Author,
+			Date:    frontMatter.Date,
+			Content: template.HTML(buffer.String()),
+		}
 
 		relativePath, err := filepath.Rel(dirPath, path)
 		if err != nil {
@@ -109,10 +121,9 @@ func main() {
 			fmt.Printf("Error creating file %s: %v\n", outputPath, err)
 			return nil
 		}
-
-		err = goldmark.Convert(markdown, file)
+		err = pageTemplate.Execute(file, page)
 		if err != nil {
-			fmt.Printf("Error converting %s: %v\n", path, err)
+			fmt.Printf("Error executing template for %s: %v\n", path, err)
 		}
 
 		file.Close()
